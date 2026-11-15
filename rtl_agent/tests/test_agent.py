@@ -63,6 +63,8 @@ class AgentTests(unittest.TestCase):
         for record in h[:5]:
             self.assertTrue(Path(record['rtl_path']).exists())
             self.assertTrue(Path(record['diff_path']).exists())
+            messages = json.loads((Path(record['directory']) / 'messages.json').read_text())
+            self.assertEqual([m['role'] for m in messages], ['system', 'user'])
         self.assertTrue(model.requests[1].feedback)
         self.assertEqual(model.requests[4].parent_rtl, (EXAMPLES/'mock_shared.v').read_text())
 

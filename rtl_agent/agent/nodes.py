@@ -12,6 +12,7 @@ from rtl_agent.eda import EDAConfig, synthesize_rtl, verify_rtl
 from rtl_agent.eda.common import digest, new_run, snapshot, validate
 from rtl_agent.eda.verifier import interface
 from rtl_agent.llm.client import ModelRequest
+from rtl_agent.llm.prompt_builder import build_messages
 from rtl_agent.report.storage import atomic_json, write_once
 from rtl_agent.strategies import load_strategies, select_candidate_strategies
 from .evaluator import assess
@@ -142,6 +143,7 @@ def generate_node(s, model):
         'forbidden': ['change interface/parameter defaults/precision/cycles/reset',
                       'modify tools, benchmark, library, constraints or verification assumptions']})
     write_once(directory / 'request.json', asdict(request))
+    write_once(directory / 'messages.json', build_messages(request))
     current = {'candidate_id': f'candidate-{round_index:04d}', 'iteration': round_index,
                'parent_id': s['parent']['id'], 'strategy_id': s['primary_strategy'],
                'requested_strategy_id': s['primary_strategy'], 'directory': str(directory),

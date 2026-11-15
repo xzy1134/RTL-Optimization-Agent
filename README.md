@@ -1,183 +1,55 @@
-# opti_demo
+# RTL 自动优化 Agent
 
-把一段 Verilog 交给 LLM 优化，并用开源 EDA 工具链自动判定该优化是否可被接受。
+使用 Python、LangGraph 和 Yosys，在功能等价、满足可配置逻辑深度约束的前提下，搜索低面积 RTL 实现。
 
-```
-[1] 基线评分    yosys 综合 -> abc 映射到工艺库 -> 提取面积(µm²) + 逻辑深度(ltp)
-[2] LLM 生成    调 llm_agent.py，生成优化后的 RTL
-[3] 等价性验证  激励 testbench -> iverilog 仿真 -> VCD 波形逐时刻比对 (PASS 才能进入后续)
-[4] 优化评分    对优化后 RTL 重跑 [1]
-[5] 汇总报告    输出接受/拒绝结论至 <outdir>/report.md
-```
+当前使用 Mock LLM 驱动真实 EDA 流程，尚未接入 DeepSeek。形式验证仅支持组合电路；逻辑深度是代理指标，不是 ns 延时。
 
----
+## 目录
 
-## 依赖要求
+| 路径 | 用途 |
+|---|---|
+| `rtl_agent/` | 当前系统的实现、测试、提示词和说明 |
+| `case/` | 从参考 Demo 保留的原始 RTL 测试用例与仿真激励 |
+| `tools.env` | 本机 Yosys 和 Liberty 路径，不提交 Git |
+| `tools.env.example` | 工具配置模板 |
+| `.agents/skills/` | 开发参考 Skill |
+| `work/rtl_agent/` | 运行产物，不提交 Git |
+| `.venv-m3/` | 本机 Python 环境，不提交 Git |
 
-| 依赖项 | 说明 | 是否必需 |
-|---|---|---|
-| **Linux (x86_64)** | 运行环境（Ubuntu / Debian 等） | 必需 |
-| **yosys** | 综合与面积/深度评分工具 | 必需 |
-| **iverilog + vvp** | 等价性验证的仿真器 | 必需 |
-| **标准单元库 (.lib)** | abc 映射的目标工艺库（如 Nangate45） | 必需 |
-| **Python 3.8+** | 调度脚本（**仅使用标准库，无需 pip 安装任何包**） | 必需 |
-| **LLM 服务** | 用于生成优化代码（默认支持 Claude CLI，亦可自定义） | 必需 |
+## 运行
 
----
+先按照 `tools.env.example` 配置 `tools.env`，填写实际 Yosys 和 Nangate45 路径。
+依赖及虚拟环境配置见 [Agent 使用说明](rtl_agent/agent/README.md)。
 
-## 快速上手（推荐）
-
-通过支持 Shell 执行与文件读写的 Agent 工具，可以全自动完成依赖探测、路径配置与首跑测试。
-
-### 步骤 1：安装你喜欢的 Agent 工具
-
-以 **Claude Code** 为例（任意具备命令执行能力的 Agent 均可，如 Cursor、Cline 等）：
+运行 Mock 搜索：
 
 ```bash
-# 官方安装脚本（推荐）
-curl -fsSL https://claude.ai/install.sh | bash
-
-# 或通过 npm 安装（需 Node.js 22+，切勿加 sudo）
-npm install -g @anthropic-ai/claude-code
+.venv-m3/bin/python -B -m rtl_agent.agent \
+  rtl_agent/examples/mock_baseline.v --top t \
+  --responses rtl_agent/examples/mock_sequence.json \
+  --depth-limit 6 --patience 8
 ```
 
-配置模型访问密钥（以兼容端点为例，可在 `~/.bashrc` 中导出）：
+完整回归测试：
+
 ```bash
-export ANTHROPIC_BASE_URL="https://你的端点地址"
-export ANTHROPIC_AUTH_TOKEN="sk-你的token"
-export ANTHROPIC_MODEL="你的模型名"
+.venv-m3/bin/python -B -m unittest discover -s rtl_agent/tests -v
 ```
 
-### 步骤 2：让 Agent 自动部署
+单独运行综合或验证：
 
-在本项目根目录下启动 Agent，并输入：
-
-> **“帮我根据 https://github.com/alex00153/opti_demo 中的readme.md 部署 opti_demo 项目”**
-
-Agent 会自动执行：
-1. 检查本机 `yosys`、`iverilog`、`python3` 等工具链；
-2. 定位或引导下载 Nangate45 标准单元库；
-3. 生成本机路径配置文件 `tools.env`；
-4. 跑一遍测试用例验证闭环。
-
-**验收标准**：看到类似下表的最终输出即代表环境部署成功：
-```
-| 指标           | 基线     | 优化后   | 变化     |
-| 面积 (µm²)    | 764.218  | 403.256  | -47.2%   |
-| 逻辑深度 (ltp) | 19       | 18       | -5.3%    |
-| 等价性         | —        | —        | PASS     |
-结论：[PASS] 接受：功能等价，面积下降，逻辑深度未恶化
-```
-
----
-
-## 运行方式
-
-### 交互模式（推荐）
 ```bash
-./run_demo.sh
-```
-按提示选择预置用例（一路直接按回车即以默认案例 `opt_top.v` 运行全流程）。
-
-### 命令行模式
-```bash
-# 运行指定 RTL 用例
-./run_demo.sh --baseline case/bench/mult8/mult8_v1_behavioral.v
-
-# 仅调试用：跳过等价性验证
-./run_demo.sh --no-equiv
+.venv-m3/bin/python -B -m rtl_agent synth case/rtl/opt_top.v --top opt_top
+.venv-m3/bin/python -B -m rtl_agent verify case/rtl/opt_top.v case/rtl/opt_top.v --top opt_top
 ```
 
-**产物查看**：
-- `out/<case>/report.md`：综合与等价性验收报告。
-- `out/<case>/optimized.v`：LLM 生成的优化 RTL。
-- `work/<case>/equiv/equiv.log`：波形比对细节日志。
+## 开发说明
 
----
+- [模块说明与阶段记录](rtl_agent/README.md)
+- [策略库与特征分析](rtl_agent/strategies/README.md)
+- [LangGraph Mock 闭环](rtl_agent/agent/README.md)
+- [提示词框架与 M4 待办提醒](rtl_agent/llm/README.md)
 
-## 接入自定义模型
+接入 DeepSeek 前，需要与用户一起检查并精进初版提示词，再实现真实响应解析和 usage 统计。
 
-demo 默认通过 `claude` CLI 驱动。若想换用任意 OpenAI 兼容模型（DeepSeek、Qwen、本地 Ollama 等），仅需两步：
-
-1. 编辑或创建 `.env`：
-   ```bash
-   LLM_BACKEND=custom
-   LLM_BASE_URL=https://api.deepseek.com
-   LLM_API_KEY=sk-xxxx
-   LLM_MODEL=deepseek-flash
-   ```
-2. 在 `llm_agent.py` 的 `call_llm_custom()` 中填入网络请求（内置了免 `pip` 安装的标准库实现）：
-   ```python
-   def call_llm_custom(prompt: str, cfg: dict) -> str:
-       import urllib.request, json
-       req = urllib.request.Request(
-           cfg["base"].rstrip("/") + "/chat/completions",
-           data=json.dumps({
-               "model": cfg["model"],
-               "messages": [{"role": "user", "content": prompt}],
-           }).encode("utf-8"),
-           headers={"Authorization": f"Bearer {cfg['key']}", "Content-Type": "application/json"},
-       )
-       with urllib.request.urlopen(req, timeout=cfg["timeout"]) as resp:
-           return json.load(resp)["choices"][0]["message"]["content"]
-   ```
-
----
-
-## 附录 A：手动部署指南（不使用 Agent）
-
-如果不使用 Agent，请按以下步骤手动配置环境：
-
-### 1. 安装基础工具链
-在 Debian / Ubuntu 下运行：
-```bash
-sudo apt update
-sudo apt install -y yosys iverilog python3 wget
-
-# 验证安装
-yosys -V && iverilog -V && python3 --version
-```
-
-### 2. 获取 Nangate45 开源标准单元库
-```bash
-mkdir -p ~/edatools && cd ~/edatools
-wget https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts/raw/master/flow/platforms/nangate45/lib/NangateOpenCellLibrary_typical.lib
-```
-
-### 3. 配置 `tools.env`
-回到项目根目录，从模板复制并修改配置文件：
-```bash
-cp tools.env.example tools.env
-```
-编辑 `tools.env`，填入绝对路径：
-```bash
-YOSYS_BIN=/usr/bin/yosys
-LIB_FILE=/home/<你的用户名>/edatools/NangateOpenCellLibrary_typical.lib
-```
-
-### 4. 验证工具链连通性
-测试 Yosys 与工艺库能否正常工作：
-```bash
-YOSYS_BIN=$(sed -n 's/^YOSYS_BIN=//p' tools.env)
-LIB_FILE=$(sed -n 's/^LIB_FILE=//p' tools.env)
-
-"$YOSYS_BIN" -p "read_verilog -sv case/rtl/opt_top.v; \
-                read_liberty -lib $LIB_FILE; \
-                hierarchy -top opt_top; proc; opt; techmap; opt; \
-                abc -liberty $LIB_FILE; stat -liberty $LIB_FILE; ltp" 2>&1 \
-  | grep -E "Chip area|Longest topological path"
-```
-若正常打印出 `Chip area` 与 `Longest topological path`，即可运行 `./run_demo.sh`。
-
----
-
-## 附录 B：常见参数与环境变量
-
-| 参数 / 变量 | 说明 | 默认值 |
-|---|---|---|
-| `--baseline <file>` | 基线 RTL 路径 | `case/rtl/opt_top.v` |
-| `--top <name>` | 顶层模块名 | 自动探测 |
-| `--outdir <dir>` | 产物输出路径 | `out/<case_name>` |
-| `--equiv-tb <mode>` | 激励源：`file` (预置) / `llm` (LLM生成) / `auto` (自动伪随机) | `file` |
-| `--no-equiv` | 跳过等价性检查（仅调试综合时使用） | 关闭 |
-| `LLM_BACKEND` | 模型后端：`claude-cli` 或 `custom` | `claude-cli` |
+项目起源于 [alex00153/opti_demo](https://github.com/alex00153/opti_demo)。原 Demo 的单次优化脚本、旧提示词和 UI 文案已清理；保留 `case/` 和原始 LICENSE。阶段验收文件保留其完成时的历史记录。

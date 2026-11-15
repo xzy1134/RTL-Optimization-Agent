@@ -8,6 +8,10 @@ M3 adds a serial LangGraph Mock search loop. See [Agent usage](agent/README.md).
 See [M3 acceptance](M3_ACCEPTANCE.md) for measured candidate results and test coverage.
 Use `.venv-m3/bin/python` for Agent commands and the combined test suite.
 
+Initial model prompts now live in `llm/prompts/`; rounds save `messages.json`.
+Pending reminder: review and refine these prompts with the user before real
+DeepSeek integration. See [prompt scaffold and M4 reminder](llm/README.md).
+
 本目录独立于原 Demo，不依赖 Claude CLI、模型 API 或第三方 Python 包。
 当前交付范围是 M1：可复现综合、组合电路形式等价验证及错误处理。
 Python 需要 3.10+；本机验收环境为 Python 3.14.4、Yosys 0.52、Nangate45。
