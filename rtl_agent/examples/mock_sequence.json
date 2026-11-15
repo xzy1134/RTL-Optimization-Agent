@@ -1,0 +1,8 @@
+[
+  {"description": "Same hardware with a source comment", "rtl_file": "mock_same.v"},
+  {"description": "Deliberately incorrect product", "rtl_file": "mock_wrong.v"},
+  {"description": "Malformed candidate", "rtl": "module t(input a,output y); assign y=; endmodule"},
+  {"strategy_id": "resource_sharing", "description": "Share mutually exclusive multipliers", "rtl_file": "mock_shared.v"},
+  {"description": "Repeat the exact previous candidate", "rtl_file": "mock_shared.v"},
+  {"action": "NO_CHANGE", "description": "End of Mock scenario"}
+]

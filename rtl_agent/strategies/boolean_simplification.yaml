@@ -1,0 +1,29 @@
+schema_version: 1
+id: boolean_simplification
+version: 1
+name: Boolean condition factoring
+goal: Explore common conditions and equivalent Boolean forms without changing defined behavior.
+enabled: true
+applicable_when:
+  - Redundant or shared conditions can be justified for all legal inputs under the existing proof contract.
+detection_hints:
+  - Generic Boolean and comparison cells exist; this does not establish redundancy.
+transformation:
+  - Factor repeated conditions or common terms while preserving selection priority.
+risks:
+  - Yosys may already perform common-subexpression and Boolean optimization.
+  - Two-state rewrites must not invent new assumptions about X or illegal states.
+validation:
+  - Require formal PASS, fixed timing compliance and identical synthesis configuration.
+requires: [combinational_equivalence, mapped_area, logic_depth]
+forbidden_changes:
+  - Do not delete branches based on unproved reachability or change original proof assumptions.
+  - Do not alter interface, precision, reset, cycles, benchmarks or scoring scripts.
+evidence_level: reference_guidance_not_locally_measured
+source:
+  - url: https://github.com/LilithSemi/claude-for-hardware/blob/master/skills/rtl-area-timing/SKILL.md
+    section: Compute Everything And Select
+    supports: Source-level deduplication may be a synthesis no-op.
+  - url: https://github.com/zhangyi-zen/synthesizable-rtl-style/blob/main/skills/synthesizable-rtl-style/SKILL.md
+    section: Expose parallelism; Use if / else if for real priority
+    supports: Express Boolean intent while retaining real priority; no area guarantee.

@@ -1,0 +1,30 @@
+schema_version: 1
+id: fsm_optimization
+version: 1
+name: State encoding exploration
+goal: Explore state encoding and decoding tradeoffs after sequential proof support is available.
+enabled: false
+applicable_when:
+  - An FSM and its reset, initial-state and illegal-state semantics are established.
+detection_hints:
+  - Registers and selection logic are only weak FSM hints, not FSM detection.
+transformation:
+  - After backend validation, explore equivalent encodings with a proven state relation.
+risks:
+  - One-hot can increase flip-flop area; binary can increase decoding cost.
+  - Changed initialization, illegal-state recovery or output timing breaks the contract.
+validation:
+  - Require an approved sequential equivalence backend and full mapped sequential area/timing support.
+  - Current M1 cannot validate this strategy; keep it disabled.
+requires: [sequential_equivalence, sequential_mapped_area, constrained_timing]
+forbidden_changes:
+  - Do not change reset, initial-state assumptions, illegal-state behavior, latency or throughput.
+  - Do not add reachability assumptions or modify interface, benchmarks or evaluation scripts.
+evidence_level: reference_guidance_not_locally_measured
+source:
+  - url: https://github.com/zhangyi-zen/synthesizable-rtl-style/blob/main/skills/synthesizable-rtl-style/SKILL.md
+    section: One-hot selection; Preserve enum type safety; Reset is architecture-driven
+    supports: Correctness requirements for encoding experiments, not evidence of area savings.
+  - url: https://github.com/hkust-zhiyao/Dr_RTL
+    section: Workflow
+    supports: Sequential changes need tool-grounded equivalence checks before promotion.

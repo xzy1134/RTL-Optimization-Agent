@@ -1,0 +1,29 @@
+schema_version: 1
+id: resource_sharing
+version: 1
+name: Mutually exclusive operator sharing
+goal: Explore smaller mapped area by moving selection before an operator.
+enabled: true
+applicable_when:
+  - Same-cycle operations have compatible widths and signedness and are selected mutually exclusively.
+detection_hints:
+  - Two distinct same-type arithmetic outputs drive opposite inputs of one mux.
+transformation:
+  - Select operand pairs before one shared operator while preserving exact finite-width semantics.
+  - Check all consumers before removing either original operator.
+risks:
+  - Input muxes may increase path depth or fanout.
+  - Extra consumers may require the original operators and remove any benefit.
+  - Identical expressions may already be shared by synthesis.
+validation:
+  - Prove the candidate against original RTL, then score with the same library and recipe.
+  - Compare area only after the fixed timing constraint passes.
+requires: [combinational_equivalence, mapped_area, logic_depth]
+forbidden_changes:
+  - Do not change ports, parameter defaults, precision, reset, latency, throughput or proof assumptions.
+  - Do not serialize operations across cycles or modify scoring tools.
+evidence_level: reference_guidance_not_locally_measured
+source:
+  - url: https://github.com/LilithSemi/claude-for-hardware/blob/master/skills/rtl-area-timing/SKILL.md
+    section: Compute Everything And Select
+    supports: Sharing distinct datapaths is a measured search direction; no Nangate45 saving is guaranteed.

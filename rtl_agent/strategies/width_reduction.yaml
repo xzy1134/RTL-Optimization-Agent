@@ -1,0 +1,32 @@
+schema_version: 1
+id: width_reduction
+version: 1
+name: Internal arithmetic width reduction
+goal: Explore removal of unnecessary internal computation bits without reducing output precision.
+enabled: true
+applicable_when:
+  - A narrower internal representation can preserve every externally observable result.
+detection_hints:
+  - Generic arithmetic output has unused high bits.
+  - Operand high bits are repeated or constant, which is only a weak extension hint.
+transformation:
+  - Trace truncation, carry and signedness before proposing narrower intermediate operands.
+  - Keep interface widths and parameter defaults unchanged.
+risks:
+  - High bits may affect comparisons, right shifts, division or signed arithmetic.
+  - Yosys may already remove unused bits; fewer RTL bits need not reduce mapped area.
+validation:
+  - Prove exact finite-width equivalence against the original.
+  - Require fixed timing and complete mapped-area measurements before acceptance.
+requires: [combinational_equivalence, mapped_area, logic_depth]
+forbidden_changes:
+  - Do not alter ports, precision, parameter defaults, cycles, reset or verification assumptions.
+  - Do not infer legal input ranges from simulation samples.
+evidence_level: reference_guidance_not_locally_measured
+source:
+  - url: https://github.com/zhangyi-zen/synthesizable-rtl-style/blob/main/skills/synthesizable-rtl-style/SKILL.md
+    section: Make bit widths explicit; Use signed types for signed arithmetic
+    supports: Width and carry correctness constraints, not a proof of area reduction.
+  - url: https://github.com/LilithSemi/claude-for-hardware/blob/master/skills/rtl-area-timing/measured-area-surprises.md
+    section: Making a multiply iterative can increase area
+    supports: Internal datapath width affects cost; its cycle-changing examples are not allowed here.

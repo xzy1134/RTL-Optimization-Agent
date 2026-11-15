@@ -1,0 +1,28 @@
+schema_version: 1
+id: arithmetic_restructuring
+version: 1
+name: Same-cycle arithmetic structure exploration
+goal: Explore equivalent arithmetic cones with a better area and depth tradeoff.
+enabled: true
+applicable_when:
+  - Arithmetic can be regrouped without changing intermediate truncation, signedness or cycle boundaries.
+detection_hints:
+  - Connected arithmetic operators, constant multiplication or arithmetic cells exist.
+transformation:
+  - Explore balanced additions or shared arithmetic subexpressions with explicit intermediate widths.
+  - Consider constant multiplication alternatives only as candidates for measurement.
+risks:
+  - Mathematical identities need not hold with the original intermediate widths.
+  - Handwritten structures can prevent better ABC mapping and increase area.
+validation:
+  - Prove against original RTL; reject changed cycles and any non-PASS result.
+  - Compare complete mapped area only after fixed timing compliance.
+requires: [combinational_equivalence, mapped_area, logic_depth]
+forbidden_changes:
+  - Do not pipeline, serialize, reduce precision or change interface, reset or parameter defaults.
+  - Do not weaken verification or modify the library and scoring recipe.
+evidence_level: reference_guidance_not_locally_measured
+source:
+  - url: https://github.com/zhangyi-zen/synthesizable-rtl-style/blob/main/skills/synthesizable-rtl-style/SKILL.md
+    section: Do not unnecessarily split one arithmetic cone; Make bit widths explicit
+    supports: Expose arithmetic cones and preserve width semantics; structural alternatives are unmeasured proposals.

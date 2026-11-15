@@ -1,0 +1,30 @@
+schema_version: 1
+id: mux_optimization
+version: 1
+name: Selection structure simplification
+goal: Explore equivalent selection logic with lower mapped cost under a fixed depth limit.
+enabled: true
+applicable_when:
+  - Selection alternatives, priority and complete input behavior can be preserved exactly.
+detection_hints:
+  - Generic mux cells or variable shifts exist; presence alone is weak evidence.
+transformation:
+  - Inspect common branch expressions and merge equivalent branches.
+  - For a proven finite set of extraction positions, explore a mux of fixed slices instead of a variable shift.
+risks:
+  - Priority, out-of-range selections and defaults may change behavior.
+  - Fixed slices and barrel shifts may map to the same or larger hardware.
+validation:
+  - Prove all defined input combinations and compare fixed-recipe area only after timing passes.
+requires: [combinational_equivalence, mapped_area, logic_depth]
+forbidden_changes:
+  - Do not add unique, full_case, parallel_case or X outputs to discard defined behavior.
+  - Do not change ports, parameters, precision, cycles, reset or evaluation conditions.
+evidence_level: reference_guidance_not_locally_measured
+source:
+  - url: https://github.com/LilithSemi/claude-for-hardware/blob/master/skills/rtl-area-timing/SKILL.md
+    section: Variable Barrel Shift
+    supports: Fixed-slice selection is a search hypothesis and can be area-neutral.
+  - url: https://github.com/zhangyi-zen/synthesizable-rtl-style/blob/main/skills/synthesizable-rtl-style/SKILL.md
+    section: Use plain case by default
+    supports: Preserve priority and unmatched-input behavior.
