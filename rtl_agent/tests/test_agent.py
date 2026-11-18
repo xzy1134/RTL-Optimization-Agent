@@ -41,11 +41,12 @@ class AgentTests(unittest.TestCase):
                     ModelResponse(rtl='module t(input a,output y); assign y=; endmodule'),
                     replace(self.response('mock_shared.v'), strategy_id='resource_sharing'), self.response('mock_shared.v')]
         s, r, h, model = self.search(sequence, depth_limit=6)
-        self.assertEqual([c['reason'] for c in h], ['NO_AREA_IMPROVEMENT', 'FORMAL_FAIL', 'PRECHECK_ERROR',
-                                                   'ACCEPTED', 'DUPLICATE', 'NO_CHANGE'])
+        self.assertEqual([c['reason'] for c in h[:5]], ['NO_AREA_IMPROVEMENT', 'FORMAL_FAIL', 'PRECHECK_ERROR',
+                                                      'ACCEPTED', 'DUPLICATE'])
+        self.assertTrue(all(c['reason'] == 'NO_CHANGE' for c in h[5:]))
         self.assertEqual(r['candidate_count'], 5)
         self.assertEqual(r['passed_count'], 2)
-        self.assertEqual(r['stop_reason'], 'NO_CHANGE')
+        self.assertEqual(r['stop_reason'], 'MAX_ROUNDS')
         self.assertAlmostEqual(r['baseline']['area'], 75.278, places=3)
         self.assertAlmostEqual(r['best']['area'], 42.560, places=3)
         self.assertEqual(r['best']['logic_depth'], 6)
@@ -107,6 +108,18 @@ class AgentTests(unittest.TestCase):
         self.assertEqual(h[1]['parent_id'], h[0]['candidate_id'])
         self.assertEqual(h[1]['synthesis'], {})
 
+    def test_custom_label_cannot_enable_sequential_optimization(self):
+        source = (EXAMPLES/'mock_shared.v').read_text()
+        source = source.replace('output [2*W-1:0] y', 'output reg [2*W-1:0] y')
+        source = source.replace('assign y=x*z;', 'always @(posedge s) y<=x*z;')
+        self.assertIn('always @(posedge s)', source)
+        _, r, h, _ = self.search([ModelResponse(strategy_id='custom_state_rewrite', rtl=source)],
+                                  budget=SearchBudget(1, 3, 3, 30))
+        self.assertEqual(h[0]['reason'], 'FORMAL_UNKNOWN')
+        self.assertFalse(h[0]['accepted'])
+        self.assertEqual(h[0]['synthesis'], {})
+        self.assertEqual(r['best']['id'], 'baseline')
+
     def test_max_candidates(self):
         _, r, h, _ = self.search([self.response('mock_shared.v')], budget=SearchBudget(1, 10, 8, 30))
         self.assertEqual(r['stop_reason'], 'MAX_CANDIDATES')
@@ -133,17 +146,19 @@ class AgentTests(unittest.TestCase):
 
     def test_no_change(self):
         _, r, h, _ = self.search([ModelResponse(action='NO_CHANGE')])
-        self.assertEqual(r['stop_reason'], 'NO_CHANGE')
+        self.assertEqual(r['stop_reason'], 'NO_IMPROVEMENT')
+        self.assertEqual(len(h), 8)
         self.assertEqual(r['candidate_count'], 0)
         self.assertEqual(r['outcome'], 'BASELINE_RETAINED')
 
-    def test_all_strategies_unavailable(self):
+    def test_no_strategy_hint_still_allows_open_exploration(self):
         source = self.root / 'wire.v'
         source.write_text('module t(input a,output y); assign y=a; endmodule')
         model = MockLLM()
         s = run_search(model, original_rtl=source, top='t', config=self.config, outdir=self.root)
-        self.assertEqual(s['stop_reason'], 'NO_AVAILABLE_STRATEGIES')
-        self.assertEqual(model.requests, [])
+        self.assertEqual(s['stop_reason'], 'NO_IMPROVEMENT')
+        self.assertEqual(model.requests[0].primary_strategy, 'open_exploration')
+        self.assertEqual(model.requests[0].strategies, [])
 
     def test_unknown_is_not_synthesized(self):
         unknown = (EXAMPLES/'mock_shared.v').read_text().replace('assign y=x*z;', "assign y=1'bx;")
@@ -152,12 +167,36 @@ class AgentTests(unittest.TestCase):
         self.assertFalse(h[0]['accepted'])
         self.assertEqual(h[0]['synthesis'], {})
 
-    def test_interface_change_and_strategy_rejection(self):
+    def test_interface_change_rejected_but_new_strategy_label_allowed(self):
         wrong_interface = (EXAMPLES/'mock_shared.v').read_text().replace('parameter W=3', 'parameter W=4')
         _, r, h, _ = self.search([ModelResponse(rtl=wrong_interface),
-            ModelResponse(strategy_id='fsm_optimization', rtl=(EXAMPLES/'mock_shared.v').read_text())])
+            ModelResponse(strategy_id='custom_operand_factoring', rtl=(EXAMPLES/'mock_shared.v').read_text())])
         self.assertEqual(h[0]['reason'], 'INTERFACE_MISMATCH')
-        self.assertEqual(h[1]['reason'], 'STRATEGY_NOT_ADMITTED')
+        self.assertEqual(h[1]['reason'], 'ACCEPTED')
+        self.assertEqual(h[1]['equivalence']['status'], 'PASS')
+
+    def test_no_change_then_fused_candidate_can_improve(self):
+        candidate = ModelResponse(strategy_id='resource_sharing+width_reduction',
+                                  rtl=(EXAMPLES/'mock_shared.v').read_text())
+        _, r, h, model = self.search([ModelResponse(action='NO_CHANGE'), candidate],
+                                     budget=SearchBudget(1, 5, 4, 30))
+        self.assertEqual([c['reason'] for c in h], ['NO_CHANGE', 'ACCEPTED'])
+        self.assertEqual(model.requests[1].constraints['exploration_mode'], 'open')
+        self.assertEqual(model.requests[1].feedback[0]['reason'], 'NO_CHANGE')
+        self.assertEqual(r['candidate_count'], 1)
+        self.assertEqual(r['rounds'], 2)
+        self.assertEqual(r['stop_reason'], 'MAX_CANDIDATES')
+        self.assertEqual(h[1]['equivalence']['status'], 'PASS')
+
+    def test_new_label_does_not_bypass_functional_or_timing_checks(self):
+        _, _, h, _ = self.search([ModelResponse(strategy_id='custom', rtl=(EXAMPLES/'mock_wrong.v').read_text())],
+                                  budget=SearchBudget(1, 3, 3, 30))
+        self.assertEqual(h[0]['reason'], 'FORMAL_FAIL')
+        self.assertEqual(h[0]['synthesis'], {})
+        _, r, h, _ = self.search([ModelResponse(strategy_id='custom', rtl=(EXAMPLES/'mock_shared.v').read_text())],
+                                  baseline='mock_priority.v', depth_limit=5, budget=SearchBudget(1, 3, 3, 30))
+        self.assertEqual(h[0]['reason'], 'DEPTH_LIMIT')
+        self.assertEqual(r['best']['id'], 'baseline')
 
     def test_invalid_budgets(self):
         with self.assertRaises(ValueError):

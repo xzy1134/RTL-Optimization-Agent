@@ -8,11 +8,12 @@ from . import nodes
 
 
 def build_graph(model, *, original_rtl, top, config=None, budget=None, outdir=None,
-                depth_limit=None, extra_sources=()):
+                depth_limit=None, extra_sources=(), diagnostics=False):
     config = config or EDAConfig.from_tools_env()
     budget = budget or SearchBudget()
     graph = StateGraph(AgentState)
-    graph.add_node('initialize', lambda s: nodes.initialize(original_rtl, top, config, budget, outdir, depth_limit, extra_sources))
+    graph.add_node('initialize', lambda s: nodes.initialize(original_rtl, top, config, budget, outdir, depth_limit, extra_sources,
+                   getattr(model, 'metadata', {'mode': 'mock'}), diagnostics))
     graph.add_node('baseline', nodes.baseline_node)
     graph.add_node('controller', nodes.control_node)
     graph.add_node('select_strategy', nodes.select_node)

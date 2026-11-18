@@ -9,11 +9,14 @@ See [M3 acceptance](M3_ACCEPTANCE.md) for measured candidate results and test co
 Use `.venv-m3/bin/python` for Agent commands and the combined test suite.
 
 Initial model prompts now live in `llm/prompts/`; rounds save `messages.json`.
-Pending reminder: review and refine these prompts with the user before real
-DeepSeek integration. See [prompt scaffold and M4 reminder](llm/README.md).
+M4 provides a bounded DeepSeek client. Review real messages and refine prompts
+with the user after the first live experiment. See [provider usage](llm/README.md).
+See [M4 acceptance](M4_ACCEPTANCE.md) for offline test results and live-run status.
+Cross-round experiment notes and existing benchmark checks are described in
+[memory acceptance](MEMORY_ACCEPTANCE.md). Later reminders are in [follow-up](FOLLOW_UP.md).
 
-本目录独立于原 Demo，不依赖 Claude CLI、模型 API 或第三方 Python 包。
-当前交付范围是 M1：可复现综合、组合电路形式等价验证及错误处理。
+本目录独立于原 Demo，不依赖 Claude CLI。M1 工具层仅使用 Python 标准库，策略层依赖 PyYAML，Agent 依赖 LangGraph。DeepSeek 客户端使用标准库 HTTP 请求，Mock 不调用 API。
+已实现 M1 综合与证明、M2 策略筛选、M3 LangGraph 闭环及 M4 DeepSeek 客户端；阶段验收记录保留当时的测试与能力说明。
 Python 需要 3.10+；本机验收环境为 Python 3.14.4、Yosys 0.52、Nangate45。
 
 ## 运行

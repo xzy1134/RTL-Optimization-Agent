@@ -9,9 +9,14 @@ class SearchBudget:
     max_rounds: int = 8
     patience: int = 4
     runtime_seconds: float = 60
+    max_api_requests: int = 8
+    max_tokens: int = 50000
 
 
 class AgentState(TypedDict, total=False):
+    diagnostics: bool
+    diagnostic_seconds: float
+    switch_location: bool
     run_dir: str
     original_path: str
     original_hash: str
@@ -34,6 +39,7 @@ class AgentState(TypedDict, total=False):
     no_improvement_rounds: int
     attempted_hashes: set[str]
     failures: list[dict]
+    recent_trials: list[dict]
     history: list[str]
     recommendations: list[dict]
     strategy_attempts: dict[str, int]
@@ -41,6 +47,7 @@ class AgentState(TypedDict, total=False):
     current: dict
     stop_reason: str | None
     model_usage: dict
+    model_info: dict
     evaluation_seconds: float
     model_seconds: float
     report_path: str

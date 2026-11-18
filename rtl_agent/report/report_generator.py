@@ -10,6 +10,7 @@ def final_report(state):
     area = baseline.get('area')
     improvement = ((area-best['area'])/area*100 if best and area else None)
     result = {
+        'diagnostics': state.get('diagnostics'), 'diagnostic_seconds': state.get('diagnostic_seconds', 0.),
         'run_dir': str(run), 'timing_metric': 'logic_depth',
         'depth_limit': state['depth_limit'], 'depth_constraint_checked': state['depth_limit'] is not None,
         'baseline': baseline, 'baseline_feasible': state.get('baseline_feasible', False),
@@ -21,10 +22,12 @@ def final_report(state):
         'area_improvement_percent': improvement, 'candidate_count': state['candidate_count'],
         'passed_count': state['passed_count'], 'rounds': state['round_index'],
         'stop_reason': state['stop_reason'], 'model_usage': state['model_usage'],
+        'model': state['model_info'], 'budget': state['budget'],
+        'token_usage_complete': state['model_usage']['unknown_usage_calls'] == 0,
         'evaluation_seconds': state['evaluation_seconds'], 'model_seconds': state['model_seconds'],
         'history': state['history'], 'config_fingerprint': state.get('config_fingerprint'),
     }
-    lines = ['# Mock RTL search report', '', f"Outcome: {result['outcome']}",
+    lines = ['# RTL search report', '', f"Outcome: {result['outcome']}",
              f"Stop: {result['stop_reason']}", f"Output RTL: {result['output_rtl']}",
              'Timing metric: logic_depth (logic levels, not ns).',
              f"Depth limit: {state['depth_limit'] if state['depth_limit'] is not None else 'NOT SET; no upper-bound constraint checked'}",
@@ -33,7 +36,9 @@ def final_report(state):
              f"Best area/depth: {best['area'] if best else None} / {best['logic_depth'] if best else None}",
              f"Area improvement (%): {improvement}",
              f"Candidates / formal PASS: {state['candidate_count']} / {state['passed_count']}",
-             'Model: Mock; real API calls and real tokens: 0.', '',
+             f"Model: {state['model_info']}",
+             f"Usage: {state['model_usage']}",
+             f"Token usage complete: {result['token_usage_complete']} (counts exclude unknown requests)", '',
              '| Candidate | Strategy | Equivalence | Area | Depth | Accepted | Reason |',
              '|---|---|---|---:|---:|---|---|']
     import json
